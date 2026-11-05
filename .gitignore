@@ -1,0 +1,47 @@
+# --- Documents du cours INFO4900 : gardés en local, jamais envoyés sur GitHub
+docs/cours/
+
+# --- Unity (d'après le .gitignore officiel de GitHub pour Unity)
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+/[Aa]ssets/AssetStoreTools*
+/[Aa]ssets/Plugins/Editor/JetBrains*
+
+# --- Fichiers générés par les éditeurs de code
+.vs/
+.vscode/
+.idea/
+.gradle/
+*.csproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# --- Divers
+*.tmp
+sysinfo.txt
+mono_crash.*
+crashlytics-build.properties
+
+# --- Builds Android : l'APK final va dans une release GitHub, pas dans le dépôt
+*.apk
+*.aab
+*.unitypackage
+
+# --- Système
+.DS_Store
+Thumbs.db
