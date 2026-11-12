@@ -5,11 +5,14 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Scenes/Parc_PremiersGestes.unity
+    guid: 0bb30607aac92a44f8f5f4e865dbdda4
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 42071c6eda2320d4ea45d45e667cc29f, type: 2}
-    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: fb3aa9f519d3eb3449684b37309725e3, type: 2}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: d2544a0df3927b540af02db059b09ea6, type: 2}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 25f018ff331a9a34d92e4cd3a129a7a4, type: 2}
