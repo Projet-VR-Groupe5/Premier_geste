@@ -9,6 +9,8 @@
 | Passant (Brian) | https://www.mixamo.com/ | Conditions d'utilisation Adobe Mixamo : utilisation dans un projet autorisée, redistribution des fichiers bruts interdite | Adobe / Mixamo |
 | Ambulancier (Chad) | https://www.mixamo.com/ | Conditions d'utilisation Adobe Mixamo : utilisation dans un projet autorisée, redistribution des fichiers bruts interdite | Adobe / Mixamo |
 | Téléphone | À compléter | À vérifier | À compléter |
+| Téléphone de bureau IP (`Assets/ThirdParty/Models/Telephone/ip-desk-phone-with-corded-handset-and-display.glb`) | À compléter par Yohann | À vérifier | À compléter |
+| Téléphone VoIP (`Assets/ThirdParty/Models/Telephone/office-voip-telephone.glb`) | À compléter par Yohann | À vérifier | À compléter |
 | DEA | À compléter | À vérifier | À compléter |
 | Décor du parc | À compléter | À vérifier | À compléter |
 
