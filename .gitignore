@@ -45,3 +45,6 @@ crashlytics-build.properties
 # --- Système
 .DS_Store
 Thumbs.db
+
+# --- Journal de mise à niveau de Visual Studio (apparu dans les PR #17 et United)
+UpgradeLog*.htm
