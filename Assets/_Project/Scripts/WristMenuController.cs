@@ -1,4 +1,4 @@
-
+using PremiersGestes.Scenario;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -15,8 +15,9 @@ public class WristMenuController : MonoBehaviour
 
     void Update()
     {
+        // Touche de test : F7 (M est déjà le bouton « menu » du simulateur XR)
         if (Keyboard.current != null &&
-            Keyboard.current.mKey.wasPressedThisFrame)
+            Keyboard.current.f7Key.wasPressedThisFrame)
         {
             ToggleMenu();
         }
@@ -63,11 +64,13 @@ public class WristMenuController : MonoBehaviour
 
     public void RestartStep()
     {
-        Debug.Log("Demande : recommencer l'etape");
+        Debug.Log("Demande : recommencer l'étape");
+        if (ScenarioManager.Instance != null) ScenarioManager.Instance.RestartStep();
     }
 
     public void BackToHome()
     {
-        Debug.Log("Demande : retour a l'accueil");
+        Debug.Log("Demande : retour à l'accueil");
+        if (ScenarioManager.Instance != null) ScenarioManager.Instance.BackToHome();
     }
 }
