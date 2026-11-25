@@ -42,3 +42,7 @@
 - Les ressources doivent être compatibles avec Unity et le projet VR.
 - Les modèles Bryce, Brian et Chad proviennent d'Adobe Mixamo.
 - Les modèles Mixamo ne doivent pas être redistribués séparément sous forme de fichiers bruts.
+
+## Voix du scénario
+
+Les consignes `01_Accueil.wav` à `07_Fin.wav` et les répliques `Repartiteur_XX.wav` sont en préparation. Les noms des interprètes seront ajoutés à réception des enregistrements, après confirmation de l’autorisation d’utilisation. [Plan d’enregistrement](docs/preparation-voix.md)
