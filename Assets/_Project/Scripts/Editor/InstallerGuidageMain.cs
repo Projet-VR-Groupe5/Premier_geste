@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text;
+using PremiersGestes.Interactions;
 using PremiersGestes.Interface;
 using PremiersGestes.Scenario;
 using UnityEditor;
@@ -57,6 +58,7 @@ namespace PremiersGestes.EditorTools
             AppliquerConfort(scene, rapport);
             PlacerPanneauConsignes(scene, rapport);
             VerifierMenuPoignet(scene, rapport);
+            InstallerGestes(scene, rapport);
 
             Undo.CollapseUndoOperations(groupe);
             EditorSceneManager.MarkSceneDirty(scene);
@@ -227,6 +229,213 @@ namespace PremiersGestes.EditorTools
             rapport.AppendLine(boutonRepeter
                 ? "- Menu au poignet : OK (ses boutons sont reliés automatiquement par le script)."
                 : "- Menu au poignet : bouton « Répéter » absent. Fais un pull de main (PR #39).");
+        }
+
+        // --- 6. Les 5 gestes de secours (scripts de la PR nº 41) ---
+
+        private static void InstallerGestes(Scene scene, StringBuilder rapport)
+        {
+            rapport.AppendLine().AppendLine("Gestes de secours :");
+            InstallerZone(scene, rapport);
+            Transform victime = InstallerVictime(scene, rapport);
+            InstallerTelephone(scene, rapport);
+            InstallerDea(scene, victime, rapport);
+        }
+
+        // Sécuriser la zone : 3 dangers à regarder autour du point de départ
+        private static void InstallerZone(Scene scene, StringBuilder rapport)
+        {
+            if (Trouver<VerifierZone>(scene) != null)
+            {
+                rapport.AppendLine("- Sécuriser la zone : déjà présent.");
+                return;
+            }
+
+            GameObject zone = CreerObjet("VerifierZone", null, Vector3.zero);
+            var verifier = zone.AddComponent<VerifierZone>();
+            verifier.pointsARegarder = new[]
+            {
+                CreerObjet("Danger_1", zone.transform, new Vector3(-3f, 1f, 2f)).transform,
+                CreerObjet("Danger_2", zone.transform, new Vector3(3f, 1f, 2f)).transform,
+                CreerObjet("Danger_3", zone.transform, new Vector3(0f, 1f, -3f)).transform,
+            };
+            rapport.AppendLine("- Sécuriser la zone : ajouté (3 points Danger_1 à 3, à déplacer sur de vrais dangers).");
+        }
+
+        // Vérifier la victime, RCR et emplacements des électrodes : tout est regroupé dans « InteractionsVictime »
+        private static Transform InstallerVictime(Scene scene, StringBuilder rapport)
+        {
+            GameObject existant = TrouverParNom(scene, "InteractionsVictime");
+            if (existant != null)
+            {
+                rapport.AppendLine("- Victime (épaule, RCR, emplacements) : déjà présent.");
+                return existant.transform;
+            }
+
+            Transform modele = TrouverParNom(scene, "Victime")?.transform ?? TrouverParNom(scene, "Ch01_nonPBR")?.transform;
+            Vector3 position = modele != null ? modele.position : new Vector3(-2f, 0f, 2f);
+            GameObject racine = CreerObjet("InteractionsVictime", null, position);
+            Transform t = racine.transform;
+
+            // Épaule : toucher pour vérifier si la victime réagit
+            GameObject epaule = CreerObjet("Epaule", t, new Vector3(0.2f, 0.2f, 0.45f));
+            epaule.AddComponent<SphereCollider>().radius = 0.12f;
+            epaule.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable>();
+            var valider = epaule.AddComponent<ValiderEtapeInteraction>();
+            valider.etape = ScenarioStepId.CheckVictim;
+
+            // RCR : point de compression au centre de la poitrine, et compteur relié aux manettes
+            GameObject point = CreerObjet("PointCompression", t, new Vector3(0f, 0.25f, 0.2f));
+            var compteur = CreerObjet("RCR", t, Vector3.zero).AddComponent<CompteurCompressions>();
+            compteur.pointCompression = point.transform;
+            compteur.mainGauche = TrouverParNom(scene, "Left Controller")?.transform;
+            compteur.mainDroite = TrouverParNom(scene, "Right Controller")?.transform;
+
+            // Emplacements des électrodes : sous la clavicule droite, et côté gauche sous l'aisselle
+            CreerEmplacement("EmplacementDroite", t, new Vector3(0.12f, 0.25f, 0.35f));
+            CreerEmplacement("EmplacementGauche", t, new Vector3(-0.15f, 0.22f, 0.1f));
+
+            rapport.AppendLine(modele != null
+                ? $"- Victime : épaule, RCR et emplacements ajoutés autour de « {modele.name} ». Ajuste « InteractionsVictime » quand elle sera couchée."
+                : "- Victime : modèle introuvable, gestes placés à un endroit provisoire (objet « InteractionsVictime »).");
+            if (compteur.mainGauche == null || compteur.mainDroite == null)
+                rapport.AppendLine("  Attention : manettes introuvables, relie « Main Gauche / Main Droite » du RCR à la main.");
+            return t;
+        }
+
+        private static void CreerEmplacement(string nom, Transform parent, Vector3 position)
+        {
+            GameObject emplacement = CreerObjet(nom, parent, position);
+            var zone = emplacement.AddComponent<SphereCollider>();
+            zone.isTrigger = true;
+            zone.radius = 0.1f;
+            emplacement.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactors.XRSocketInteractor>();
+        }
+
+        // Alerter : prendre le téléphone déclenche l'appel au 911
+        private static void InstallerTelephone(Scene scene, StringBuilder rapport)
+        {
+            if (Trouver<TelephoneAppel>(scene) != null)
+            {
+                rapport.AppendLine("- Téléphone : déjà présent.");
+                return;
+            }
+
+            GameObject telephone = TrouverParNom(scene, "Telephone_VR");
+            if (telephone == null)
+            {
+                rapport.AppendLine("- Téléphone : « Telephone_VR » introuvable dans la scène.");
+                return;
+            }
+
+            Undo.AddComponent<TelephoneAppel>(telephone); // Ajoute aussi XR Grab Interactable et Rigidbody
+            var corps = telephone.GetComponent<Rigidbody>();
+            if (corps != null)
+            {
+                corps.useGravity = false;   // Reste où on le lâche, ne tombe pas à travers le décor
+                corps.isKinematic = true;
+            }
+            rapport.AppendLine("- Téléphone : on peut le prendre, l'appel au 911 démarre.");
+        }
+
+        // DEA : 2 électrodes à poser, analyse, puis bouton Choc
+        private static void InstallerDea(Scene scene, Transform victime, StringBuilder rapport)
+        {
+            if (Trouver<DeaController>(scene) != null)
+            {
+                rapport.AppendLine("- DEA : déjà présent.");
+                return;
+            }
+
+            GameObject modele = TrouverParNom(scene, "DEA");
+            Vector3 position = modele != null ? modele.transform.position + new Vector3(0f, 0.15f, 0f) : new Vector3(-1.5f, 0.3f, 2f);
+            GameObject racine = CreerObjet("DEAInteractif", null, position);
+            Transform t = racine.transform;
+
+            CreerCube("Electrode_1", t, new Vector3(-0.06f, 0f, 0f), new Vector3(0.08f, 0.01f, 0.12f), true);
+            CreerCube("Electrode_2", t, new Vector3(0.06f, 0f, 0f), new Vector3(0.08f, 0.01f, 0.12f), true);
+            GameObject bouton = CreerCube("BoutonChoc", t, new Vector3(0f, 0f, 0.12f), new Vector3(0.05f, 0.03f, 0.05f), false);
+            GameObject voyant = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            voyant.name = "VoyantPret";
+            voyant.transform.SetParent(t, false);
+            voyant.transform.localPosition = new Vector3(0f, 0.03f, -0.1f);
+            voyant.transform.localScale = Vector3.one * 0.03f;
+            Object.DestroyImmediate(voyant.GetComponent<Collider>());
+            voyant.SetActive(false);
+
+            var son = racine.AddComponent<AudioSource>();
+            son.playOnAwake = false;
+            son.spatialBlend = 1f;
+
+            var dea = racine.AddComponent<DeaController>();
+            dea.boutonChoc = bouton.GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable>();
+            dea.voyantPret = voyant;
+            dea.hautParleur = son;
+            if (victime != null)
+            {
+                dea.emplacements = new[]
+                {
+                    victime.Find("EmplacementDroite")?.GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactors.XRSocketInteractor>(),
+                    victime.Find("EmplacementGauche")?.GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactors.XRSocketInteractor>(),
+                };
+            }
+
+            rapport.AppendLine(modele != null
+                ? "- DEA : 2 électrodes, bouton Choc et voyant ajoutés sur le DEA (objet « DEAInteractif »)."
+                : "- DEA : modèle « DEA » introuvable, placé à un endroit provisoire (objet « DEAInteractif »).");
+        }
+
+        private static GameObject CreerCube(string nom, Transform parent, Vector3 position, Vector3 taille, bool attrapable)
+        {
+            GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            cube.name = nom;
+            cube.transform.SetParent(parent, false);
+            cube.transform.localPosition = position;
+            cube.transform.localScale = taille;
+            if (attrapable)
+            {
+                cube.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+                var corps = cube.GetComponent<Rigidbody>();
+                if (corps != null)
+                {
+                    corps.useGravity = false;
+                    corps.isKinematic = true;
+                }
+            }
+            else
+            {
+                cube.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable>();
+            }
+            return cube;
+        }
+
+        private static GameObject CreerObjet(string nom, Transform parent, Vector3 position)
+        {
+            var objet = new GameObject(nom);
+            if (parent == null)
+            {
+                SceneManager.MoveGameObjectToScene(objet, SceneManager.GetActiveScene());
+                Undo.RegisterCreatedObjectUndo(objet, "Créer " + nom);
+                objet.transform.position = position;
+            }
+            else
+            {
+                objet.transform.SetParent(parent, false);
+                objet.transform.localPosition = position;
+            }
+            return objet;
+        }
+
+        private static GameObject TrouverParNom(Scene scene, string nom)
+        {
+            foreach (GameObject racine in scene.GetRootGameObjects())
+            {
+                foreach (Transform enfant in racine.GetComponentsInChildren<Transform>(true))
+                {
+                    if (enfant.name == nom) return enfant.gameObject;
+                }
+            }
+            return null;
         }
 
         // --- Outils ---
