@@ -67,3 +67,16 @@ Axes Unity X et Z. Les coordonnées sont en mètres dans Main, arrondies au cent
 ## Validation restante
 
 Vérifier en Play Mode puis sur Quest 3 le parcours complet, les deux manettes, le retour à l’accueil, l’orientation du menu et la lecture du bilan en position assise et debout. Confirmer avec l’intégration les destinations fixes, l’identité de la victime, la position pour la RCR, la disponibilité des voix et l’emplacement du bilan.
+
+
+## Tests réalisés sur PC
+
+Les tests suivants ont été réalisés dans la scène Sandbox_Abdelmoghite avec le simulateur XR :
+
+- Téléportation : fonctionnelle.
+- Rotation par crans de 45° : fonctionnelle.
+- Déplacement continu : désactivé avec succès.
+- Menu au poignet : apparence vérifiée.
+- Panneau de bilan : apparence vérifiée.
+
+Les réglages de confort ont été testés temporairement dans la Sandbox. Leur application dans Main et les tests sur Meta Quest 3 restent à réaliser.

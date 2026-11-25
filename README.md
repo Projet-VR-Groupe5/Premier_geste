@@ -16,7 +16,7 @@ _À compléter au jalon 5 par Aina : lien vers la vidéo tournée sur le Meta Qu
 |---|---|---|
 | Emile Otton | Gestionnaire de projet et intégration | XxEmile |
 | Yohann | Responsable des interactions VR | _à compléter_ |
-| Abdelmoghite Zerane | Responsable locomotion, ergonomie et interface | _à compléter_ |
+| Abdelmoghite Zerane | Responsable locomotion, ergonomie et interface | zabdelmoghite-dotcom |
 | Ilyas | Responsable environnement et systèmes | moutadiilyas |
 | Aina | Responsable tests, build et performance | _à compléter_ |
 
@@ -117,7 +117,7 @@ _À compléter._
 - **Interfaces.** Le menu au poignet et le panneau de consignes accompagnent les étapes du scénario. Le menu propose une disposition mise à jour et une confirmation masquée par défaut. Le prefab `PanneauBilan` utilise un Canvas World Space et du texte TextMeshPro. Ses valeurs illustrent le rendu et ses boutons attendent leur raccordement.
 - **Ergonomie de la RCR.** Le prototype ajuste la hauteur de Camera Offset pendant la RCR. La portée des mains et la transition de hauteur restent à contrôler sur casque.
 - **Entraînement.** `ZoneEntrainement` regroupe une surface téléportable, un cube saisissable et un panneau avec un bouton Commencer. Le prototype a été testé sur le simulateur XR sur PC. L’intégration dans Main a été faite par Émile via la PR nº 38.
-- **Validation de cette livraison.** Inspection de la scène et de ses composants, des références des prefabs et de leurs événements sérialisés. La licence Unity a bloqué le lancement de l’éditeur en mode batch. La compilation, la lecture VR du menu et du bilan, le parcours intégré et les nouvelles entrées restent à vérifier en Play Mode et sur Quest 3.
+-**Validation de cette livraison.** Le menu au poignet et le panneau de bilan ont été vérifiés visuellement dans Unity. Les tests de locomotion réalisés avec le simulateur XR sur PC ont confirmé le bon fonctionnement de la téléportation, de la rotation par crans de 45° et de la désactivation du déplacement continu. Les tests fonctionnels des nouvelles interfaces et les essais sur Meta Quest 3 restent à réaliser.
 
 [Parcours utilisateur et règles de confort](docs/parcours-et-confort.md) · [Préparation des voix](docs/preparation-voix.md)
 
