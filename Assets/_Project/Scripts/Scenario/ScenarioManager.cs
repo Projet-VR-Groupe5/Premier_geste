@@ -94,6 +94,15 @@ namespace PremiersGestes.Scenario
         /// <summary>Retour au tout début (bouton du menu au poignet).</summary>
         public void BackToHome() => GoToStep(ScenarioStepId.Welcome);
 
+        /// <summary>
+        /// Lance le scénario depuis l'accueil (bouton « Commencer »).
+        /// Ne fait rien si le scénario a déjà commencé : appuyer deux fois ne saute jamais d'étape.
+        /// </summary>
+        public void StartScenario()
+        {
+            TryCompleteStep(ScenarioStepId.Welcome);
+        }
+
         // --- Tests sans casque : clic droit sur le composant dans l'Inspector, en mode Play ---
         [ContextMenu("Test : étape suivante")]
         private void DebugNextStep() => CompleteCurrentStep();
@@ -103,5 +112,8 @@ namespace PremiersGestes.Scenario
 
         [ContextMenu("Test : retour à l'accueil")]
         private void DebugBackToHome() => BackToHome();
+
+        [ContextMenu("Test : commencer (bouton Commencer)")]
+        private void DebugStartScenario() => StartScenario();
     }
 }
