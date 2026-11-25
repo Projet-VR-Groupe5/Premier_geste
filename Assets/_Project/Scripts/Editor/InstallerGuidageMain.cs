@@ -240,7 +240,480 @@ namespace PremiersGestes.EditorTools
             Transform victime = InstallerVictime(scene, rapport);
             InstallerTelephone(scene, rapport);
             InstallerDea(scene, victime, rapport);
+            CoucherVictime(scene, rapport);
+            AnimerTemoins(scene, rapport);
+            BrancherVoix911(scene, rapport);
+            AlignerParc(scene, rapport);
+            AjusterTaillesEtSol(scene, rapport);
+            PlacerGestesSurLeCorps(scene, rapport);
             AjouterReperes(scene, rapport);
+        }
+
+        // --- 9. Zones des gestes placées sur le squelette de la victime ---
+
+        private static void PlacerGestesSurLeCorps(Scene scene, StringBuilder rapport)
+        {
+            GameObject victime = TrouverParNom(scene, "Victime");
+            GameObject gestes = TrouverParNom(scene, "InteractionsVictime");
+            if (victime == null || gestes == null) return;
+
+            Transform hanches = Os(victime, HumanBodyBones.Hips, "Hips");
+            Transform poitrine = Os(victime, HumanBodyBones.Chest, "Spine1");
+            Transform hautPoitrine = Os(victime, HumanBodyBones.UpperChest, "Spine2");
+            Transform cou = Os(victime, HumanBodyBones.Neck, "Neck");
+            Transform epauleDroite = Os(victime, HumanBodyBones.RightUpperArm, "RightArm");
+            Transform epauleGauche = Os(victime, HumanBodyBones.LeftUpperArm, "LeftArm");
+            if (hanches == null || poitrine == null || hautPoitrine == null || cou == null || epauleDroite == null || epauleGauche == null)
+            {
+                rapport.AppendLine("- Zones sur le corps : squelette de la victime introuvable, positions inchangées.");
+                return;
+            }
+
+            Vector3 devant = victime.transform.forward;                         // Vers le ciel : elle est couchée sur le dos
+            Vector3 versPieds = (hanches.position - cou.position).normalized;   // Le long du corps, vers les pieds
+
+            int deplacees = 0;
+            // Bas du sternum, à la surface de la poitrine : là où on pose les mains pour la RCR
+            deplacees += PlacerMonde(gestes.transform, "PointCompression",
+                Vector3.Lerp(poitrine.position, hautPoitrine.position, 0.4f) + devant * 0.11f);
+            // Épaule droite : là où on tape pour vérifier si la victime réagit
+            deplacees += PlacerMonde(gestes.transform, "Epaule", epauleDroite.position + devant * 0.06f);
+            // Électrode 1 : sous la clavicule droite
+            deplacees += PlacerMonde(gestes.transform, "EmplacementDroite",
+                Vector3.Lerp(hautPoitrine.position, epauleDroite.position, 0.5f) + versPieds * 0.05f + devant * 0.1f);
+            // Électrode 2 : côté gauche, sous l'aisselle
+            deplacees += PlacerMonde(gestes.transform, "EmplacementGauche",
+                epauleGauche.position + versPieds * 0.15f + devant * 0.04f);
+
+            rapport.AppendLine(deplacees > 0
+                ? $"- Zones sur le corps : {deplacees} placée(s) sur le squelette (poitrine, épaule droite, électrodes)."
+                : "- Zones sur le corps : déjà bien placées.");
+        }
+
+        // Os du squelette : d'abord par l'avatar Humanoid, sinon par le nom Mixamo (ex. « mixamorig12:Spine1 »)
+        private static Transform Os(GameObject modele, HumanBodyBones os, string nomMixamo)
+        {
+            Animator animateur = modele.GetComponent<Animator>();
+            if (animateur != null && animateur.avatar != null && animateur.avatar.isHuman)
+            {
+                Transform trouve = animateur.GetBoneTransform(os);
+                if (trouve != null) return trouve;
+            }
+            foreach (Transform enfant in modele.GetComponentsInChildren<Transform>(true))
+            {
+                if (enfant.name == nomMixamo || enfant.name.EndsWith(":" + nomMixamo)) return enfant;
+            }
+            return null;
+        }
+
+        private static int PlacerMonde(Transform parent, string nom, Vector3 position)
+        {
+            Transform enfant = parent.Find(nom);
+            if (enfant == null || Vector3.Distance(enfant.position, position) < 0.01f) return 0;
+            Undo.RecordObject(enfant, "Placer " + nom);
+            enfant.position = position;
+            return 1;
+        }
+
+        // --- 7 bis. Alignement du parc : l'allée du parc à la hauteur du sol du joueur ---
+
+        // Forme 3D du parc (sans collisions) : on mesure sa surface directement sur ses triangles
+        private class MaillageParc
+        {
+            public Vector3[] sommets; // En coordonnées du monde
+            public int[] triangles;
+            public Bounds limites;
+        }
+
+        private static List<MaillageParc> maillagesParc;
+
+        private static void PreparerParc(Scene scene)
+        {
+            maillagesParc = new List<MaillageParc>();
+            GameObject parc = TrouverParNom(scene, "parco con fontana");
+            if (parc == null) return;
+
+            foreach (MeshFilter filtre in parc.GetComponentsInChildren<MeshFilter>(true))
+            {
+                Mesh maillage = filtre.sharedMesh;
+                if (maillage == null) continue;
+                Matrix4x4 versMonde = filtre.transform.localToWorldMatrix;
+                Vector3[] locaux = maillage.vertices;
+                var monde = new Vector3[locaux.Length];
+                for (int i = 0; i < locaux.Length; i++) monde[i] = versMonde.MultiplyPoint3x4(locaux[i]);
+                if (monde.Length == 0) continue;
+                var limites = new Bounds(monde[0], Vector3.zero);
+                foreach (Vector3 point in monde) limites.Encapsulate(point);
+                maillagesParc.Add(new MaillageParc { sommets = monde, triangles = maillage.triangles, limites = limites });
+            }
+        }
+
+        // Hauteur de la plus haute surface plate du parc sous le point (x, z), en dessous de « plafond »
+        private static float? HauteurParc(float x, float z, float plafond)
+        {
+            if (maillagesParc == null) return null;
+            float meilleure = float.NegativeInfinity;
+            foreach (MaillageParc m in maillagesParc)
+            {
+                if (x < m.limites.min.x || x > m.limites.max.x || z < m.limites.min.z || z > m.limites.max.z) continue;
+                Vector3[] s = m.sommets;
+                int[] tri = m.triangles;
+                for (int i = 0; i + 2 < tri.Length; i += 3)
+                {
+                    Vector3 a = s[tri[i]], b = s[tri[i + 1]], c = s[tri[i + 2]];
+                    if (x < Mathf.Min(a.x, b.x, c.x) || x > Mathf.Max(a.x, b.x, c.x)) continue;
+                    if (z < Mathf.Min(a.z, b.z, c.z) || z > Mathf.Max(a.z, b.z, c.z)) continue;
+                    Vector3 normale = Vector3.Cross(b - a, c - a);
+                    if (normale.sqrMagnitude < 1e-12f || Mathf.Abs(normale.normalized.y) < 0.7f) continue; // Pas une surface plate
+
+                    float d = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
+                    if (Mathf.Abs(d) < 1e-9f) continue;
+                    float l1 = ((b.z - c.z) * (x - c.x) + (c.x - b.x) * (z - c.z)) / d;
+                    float l2 = ((c.z - a.z) * (x - c.x) + (a.x - c.x) * (z - c.z)) / d;
+                    float l3 = 1f - l1 - l2;
+                    if (l1 < 0f || l2 < 0f || l3 < 0f) continue; // Le point n'est pas au-dessus de ce triangle
+
+                    float y = l1 * a.y + l2 * b.y + l3 * c.y;
+                    if (y < plafond && y > meilleure) meilleure = y;
+                }
+            }
+            return float.IsNegativeInfinity(meilleure) ? (float?)null : meilleure;
+        }
+
+        private static void AlignerParc(Scene scene, StringBuilder rapport)
+        {
+            GameObject decor = TrouverParNom(scene, "Decor");
+            PreparerParc(scene);
+            if (decor == null || maillagesParc.Count == 0)
+            {
+                rapport.AppendLine("- Parc : modèle « parco con fontana » introuvable, hauteur inchangée.");
+                return;
+            }
+
+            var origine = Trouver<Unity.XR.CoreUtils.XROrigin>(scene);
+            Vector3 depart = origine != null ? origine.transform.position : Vector3.zero;
+            float solJoueur = depart.y;
+
+            float? allee = HauteurParc(depart.x, depart.z, solJoueur + 0.5f);
+            if (allee == null)
+            {
+                rapport.AppendLine("- Parc : pas d'allée trouvée sous le point de départ, hauteur inchangée.");
+                return;
+            }
+
+            float ecart = allee.Value - solJoueur;
+            if (Mathf.Abs(ecart) < 0.02f)
+            {
+                rapport.AppendLine("- Parc : déjà aligné sur le sol du joueur.");
+                return;
+            }
+
+            Undo.RecordObject(decor.transform, "Aligner le parc");
+            decor.transform.position -= new Vector3(0f, ecart, 0f); // Tout le décor bouge ensemble
+            Physics.SyncTransforms();
+            PreparerParc(scene); // Nouvelle position du parc pour les mesures suivantes
+            rapport.AppendLine($"- Parc : {(ecart < 0f ? "remonté" : "descendu")} de {Mathf.Abs(ecart):0.00} m, l'allée est maintenant au niveau du sol du joueur.");
+        }
+
+        // --- 8. Tailles réelles et sol : victime posée sur le sol, téléphone et DEA à la bonne taille ---
+
+        private const float TailleTelephone = 0.16f; // Un smartphone : environ 16 cm
+        private const float TailleDea = 0.30f;       // Un vrai défibrillateur : environ 30 cm
+
+        private static void AjusterTaillesEtSol(Scene scene, StringBuilder rapport)
+        {
+            Physics.SyncTransforms();
+
+            GameObject victime = TrouverParNom(scene, "Victime");
+            if (victime != null)
+                rapport.AppendLine(PoserAuSol(victime)
+                    ? "- Victime : posée sur le sol (elle n'est plus enterrée)."
+                    : "- Victime : déjà sur le sol.");
+
+            int temoinsPoses = 0;
+            foreach (string nom in new[] { "Temoin1", "Temoin2" })
+            {
+                GameObject temoin = TrouverParNom(scene, nom);
+                if (temoin != null && PoserAuSol(temoin)) temoinsPoses++;
+            }
+            if (temoinsPoses > 0) rapport.AppendLine($"- Témoins : {temoinsPoses} reposé(s) sur l'allée.");
+
+            GameObject telephone = TrouverParNom(scene, "Telephone_VR");
+            if (telephone != null)
+            {
+                bool taille = Redimensionner(telephone, TailleTelephone);
+                bool sol = PoserAuSol(telephone);
+                rapport.AppendLine(taille || sol
+                    ? $"- Téléphone : ramené à environ {TailleTelephone * 100f:0} cm et posé sur ce qu'il y a dessous."
+                    : "- Téléphone : taille et position déjà bonnes.");
+            }
+
+            GameObject dea = TrouverParNom(scene, "DEA");
+            if (dea != null)
+            {
+                bool taille = Redimensionner(dea, TailleDea);
+                bool sol = PoserAuSol(dea);
+                bool dessus = PlacerSurLeDea(scene, dea);
+                rapport.AppendLine(taille || sol || dessus
+                    ? $"- DEA : ramené à environ {TailleDea * 100f:0} cm, posé au sol, électrodes et bouton Choc replacés dessus."
+                    : "- DEA : taille et position déjà bonnes.");
+            }
+        }
+
+        // Change l'échelle pour que la plus grande dimension vaille « cible » (sans bouger le centre)
+        private static bool Redimensionner(GameObject objet, float cible)
+        {
+            if (!Limites(objet, out Bounds avant)) return false;
+            float taille = Mathf.Max(avant.size.x, avant.size.y, avant.size.z);
+            if (taille <= 0f || Mathf.Abs(taille - cible) / cible < 0.2f) return false; // Déjà la bonne taille
+
+            Transform t = objet.transform;
+            Undo.RecordObject(t, "Redimensionner " + objet.name);
+            t.localScale *= cible / taille;
+            if (Limites(objet, out Bounds apres))
+            {
+                Vector3 decalage = avant.center - apres.center;
+                t.position += new Vector3(decalage.x, 0f, decalage.z); // Reste au même endroit
+            }
+            PrefabUtility.RecordPrefabInstancePropertyModifications(t);
+            Physics.SyncTransforms();
+            return true;
+        }
+
+        // Pose le point le plus bas de l'objet sur ce qu'il y a juste en dessous (sol, banc, table…)
+        private static bool PoserAuSol(GameObject objet)
+        {
+            if (!Limites(objet, out Bounds limites)) return false;
+            float ecart = limites.min.y - HauteurSous(objet, limites);
+            if (Mathf.Abs(ecart) < 0.03f) return false; // Déjà posé
+
+            Transform t = objet.transform;
+            Undo.RecordObject(t, "Poser " + objet.name);
+            t.position -= new Vector3(0f, ecart, 0f);
+            PrefabUtility.RecordPrefabInstancePropertyModifications(t);
+            Physics.SyncTransforms();
+            return true;
+        }
+
+        // Hauteur de la surface sous l'objet : la plus haute entre la forme du parc et les collisions
+        // (sol du joueur, tables…) ; à défaut, le sol du joueur (Y = 0)
+        private static float HauteurSous(GameObject objet, Bounds limites)
+        {
+            float plafond = limites.min.y + 0.3f; // Au-dessus : ce n'est pas une surface sous l'objet
+            float? meilleure = HauteurParc(limites.center.x, limites.center.z, plafond);
+
+            var depart = new Vector3(limites.center.x, limites.max.y + 0.05f, limites.center.z);
+            RaycastHit[] touches = Physics.RaycastAll(depart, Vector3.down, limites.size.y + 5f, ~0, QueryTriggerInteraction.Ignore);
+            System.Array.Sort(touches, (a, b) => a.distance.CompareTo(b.distance));
+            foreach (RaycastHit touche in touches)
+            {
+                Transform t = touche.collider.transform;
+                if (t.IsChildOf(objet.transform)) continue;                    // L'objet lui-même
+                if (t.GetComponentInParent<Unity.XR.CoreUtils.XROrigin>() != null) continue; // Le joueur
+                if (touche.point.y > plafond) continue;
+                if (meilleure == null || touche.point.y > meilleure.Value) meilleure = touche.point.y;
+                break;
+            }
+            return meilleure ?? 0f;
+        }
+
+        // Électrodes, bouton Choc et voyant sur le dessus du DEA
+        private static bool PlacerSurLeDea(Scene scene, GameObject dea)
+        {
+            GameObject pieces = TrouverParNom(scene, "DEAInteractif");
+            if (pieces == null || !Limites(dea, out Bounds limites)) return false;
+
+            var cible = new Vector3(limites.center.x, limites.max.y + 0.01f, limites.center.z);
+            if (Vector3.Distance(pieces.transform.position, cible) < 0.02f) return false;
+            Undo.RecordObject(pieces.transform, "Placer les pièces du DEA");
+            pieces.transform.position = cible;
+            return true;
+        }
+
+        // Boîte englobante précise de la forme visible (sans les repères ni les gestes ajoutés)
+        private static bool Limites(GameObject objet, out Bounds limites)
+        {
+            limites = new Bounds();
+            bool trouve = false;
+            foreach (Renderer rendu in objet.GetComponentsInChildren<Renderer>(true))
+            {
+                if (EstAjoute(rendu.transform, objet.transform)) continue;
+                foreach (Vector3 point in Sommets(rendu))
+                {
+                    if (!trouve) { limites = new Bounds(point, Vector3.zero); trouve = true; }
+                    else limites.Encapsulate(point);
+                }
+            }
+            return trouve;
+        }
+
+        // Ignore ce que l'outil a ajouté dans le modèle : repères, InteractionsVictime, DEAInteractif
+        private static bool EstAjoute(Transform t, Transform racine)
+        {
+            for (Transform courant = t; courant != null && courant != racine; courant = courant.parent)
+            {
+                if (courant.name == "Repere" || courant.name == "InteractionsVictime" || courant.name == "DEAInteractif") return true;
+            }
+            return false;
+        }
+
+        // Sommets en coordonnées du monde (forme réelle, y compris un personnage couché)
+        private static IEnumerable<Vector3> Sommets(Renderer rendu)
+        {
+            var points = new List<Vector3>();
+            try
+            {
+                if (rendu is SkinnedMeshRenderer peau && peau.sharedMesh != null)
+                {
+                    var maillage = new Mesh();
+                    peau.BakeMesh(maillage, true); // Échelle incluse : il reste la position et la rotation
+                    Transform t = peau.transform;
+                    foreach (Vector3 v in maillage.vertices) points.Add(t.position + t.rotation * v);
+                    Object.DestroyImmediate(maillage);
+                }
+                else if (rendu.TryGetComponent(out MeshFilter filtre) && filtre.sharedMesh != null)
+                {
+                    Matrix4x4 versMonde = rendu.transform.localToWorldMatrix;
+                    foreach (Vector3 v in filtre.sharedMesh.vertices) points.Add(versMonde.MultiplyPoint3x4(v));
+                }
+            }
+            catch (System.Exception)
+            {
+                points.Clear();
+            }
+
+            if (points.Count == 0)
+            {
+                // Secours : la boîte calculée par Unity (un peu moins précise)
+                Bounds b = rendu.bounds;
+                points.Add(b.min);
+                points.Add(b.max);
+            }
+            return points;
+        }
+
+        // --- 7. Travail d'Ilyas (PR nº 44) : victime couchée, témoins animés, voix du 911 ---
+
+        // Pose de la victime dans la scène d'Ilyas : sur le dos, la tête vers +X
+        private static readonly Vector3 PoseCouchee = new Vector3(-90f, 0f, -90f);
+
+        private static void CoucherVictime(Scene scene, StringBuilder rapport)
+        {
+            GameObject victime = TrouverParNom(scene, "Victime");
+            if (victime == null) victime = TrouverParNom(scene, "Ch01_nonPBR");
+            if (victime == null)
+            {
+                rapport.AppendLine("- Victime couchée : modèle introuvable (Victime ou Ch01_nonPBR).");
+                return;
+            }
+
+            Transform t = victime.transform;
+            bool dejaCouchee = Vector3.Angle(t.up, Vector3.up) > 45f;
+            if (!dejaCouchee)
+            {
+                Undo.RecordObject(t, "Coucher la victime");
+                t.localEulerAngles = PoseCouchee;
+                t.localPosition += new Vector3(0f, 0.14f, 0f); // Ne s'enfonce pas dans le sol
+                PrefabUtility.RecordPrefabInstancePropertyModifications(t);
+            }
+            Renommer(victime, "Victime");
+
+            // Les gestes deviennent des enfants de la victime : ils la suivent si elle bouge
+            GameObject gestes = TrouverParNom(scene, "InteractionsVictime");
+            bool dejaAlignes = gestes != null && gestes.transform.parent == t;
+            if (gestes != null && !dejaAlignes)
+            {
+                Transform g = gestes.transform;
+                Undo.SetTransformParent(g, t, "Placer les gestes sur la victime");
+                Undo.RecordObject(g, "Placer les gestes sur la victime");
+                g.localPosition = Vector3.zero;
+                g.localRotation = Quaternion.identity;
+                Vector3 echelle = t.lossyScale;
+                g.localScale = new Vector3(1f / echelle.x, 1f / echelle.y, 1f / echelle.z);
+
+                // Positions dans le repère du corps : X = côté droit, Y = vers la tête, Z = devant (vers le ciel une fois couchée)
+                Placer(g, "Epaule", new Vector3(0.18f, 1.42f, 0.05f));
+                Placer(g, "PointCompression", new Vector3(0f, 1.25f, 0.13f));
+                Placer(g, "EmplacementDroite", new Vector3(0.1f, 1.35f, 0.12f));
+                Placer(g, "EmplacementGauche", new Vector3(-0.17f, 1.18f, 0.07f));
+                Placer(g, "RCR", Vector3.zero);
+            }
+
+            rapport.AppendLine(dejaCouchee && dejaAlignes
+                ? "- Victime couchée : déjà fait."
+                : "- Victime couchée sur le dos (pose d'Ilyas) ; épaule, poitrine et électrodes placées sur son corps (à ajuster si besoin).");
+        }
+
+        private static void Placer(Transform parent, string nom, Vector3 position)
+        {
+            Transform enfant = parent.Find(nom);
+            if (enfant == null) return;
+            Undo.RecordObject(enfant, "Placer " + nom);
+            enfant.localPosition = position;
+            enfant.localRotation = Quaternion.identity;
+        }
+
+        private static void AnimerTemoins(Scene scene, StringBuilder rapport)
+        {
+            var controleur = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/_Project/Animation/Temoin1.controller");
+            if (controleur == null)
+            {
+                rapport.AppendLine("- Témoins : animation Temoin1 introuvable (Assets/_Project/Animation).");
+                return;
+            }
+
+            int animes = Animer(scene, "Temoin1", "Ch16_nonPBR", controleur) + Animer(scene, "Temoin2", "Ch42_nonPBR", controleur);
+            rapport.AppendLine(animes > 0
+                ? $"- Témoins : {animes} animé(s) avec l'animation Idle d'Ilyas (renommés Temoin1 et Temoin2)."
+                : "- Témoins : déjà animés.");
+        }
+
+        private static int Animer(Scene scene, string nouveauNom, string ancienNom, RuntimeAnimatorController controleur)
+        {
+            GameObject temoin = TrouverParNom(scene, nouveauNom);
+            if (temoin == null) temoin = TrouverParNom(scene, ancienNom);
+            if (temoin == null) return 0;
+            Renommer(temoin, nouveauNom);
+
+            Animator animateur = temoin.GetComponent<Animator>();
+            if (animateur == null || animateur.runtimeAnimatorController == controleur) return 0;
+            Undo.RecordObject(animateur, "Animer " + nouveauNom);
+            animateur.runtimeAnimatorController = controleur;
+            animateur.applyRootMotion = false; // Reste sur place
+            PrefabUtility.RecordPrefabInstancePropertyModifications(animateur);
+            return 1;
+        }
+
+        private static void BrancherVoix911(Scene scene, StringBuilder rapport)
+        {
+            TelephoneAppel telephone = Trouver<TelephoneAppel>(scene);
+            var voix = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Project/Audio/Voix911.mp3");
+            if (telephone == null || voix == null)
+            {
+                rapport.AppendLine("- Voix du 911 : téléphone ou fichier Voix911.mp3 introuvable.");
+                return;
+            }
+
+            bool vide = telephone.repliques == null || telephone.repliques.Length == 0
+                        || System.Array.TrueForAll(telephone.repliques, replique => replique == null);
+            if (!vide)
+            {
+                rapport.AppendLine("- Voix du 911 : le téléphone a déjà ses répliques.");
+                return;
+            }
+
+            Undo.RecordObject(telephone, "Voix du 911");
+            telephone.repliques = new[] { voix };
+            EditorUtility.SetDirty(telephone);
+            rapport.AppendLine("- Voix du 911 : Voix911.mp3 (Ilyas) jouée par le téléphone quand on décroche.");
+        }
+
+        private static void Renommer(GameObject objet, string nom)
+        {
+            if (objet.name == nom) return;
+            Undo.RecordObject(objet, "Renommer " + nom);
+            objet.name = nom;
+            PrefabUtility.RecordPrefabInstancePropertyModifications(objet);
         }
 
         // Repères visibles : sans eux, le joueur ne voit pas où regarder ou toucher dans le casque
