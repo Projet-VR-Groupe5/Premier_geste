@@ -240,6 +240,77 @@ namespace PremiersGestes.EditorTools
             Transform victime = InstallerVictime(scene, rapport);
             InstallerTelephone(scene, rapport);
             InstallerDea(scene, victime, rapport);
+            AjouterReperes(scene, rapport);
+        }
+
+        // Repères visibles : sans eux, le joueur ne voit pas où regarder ou toucher dans le casque
+        private static void AjouterReperes(Scene scene, StringBuilder rapport)
+        {
+            var jaune = new Color(1f, 0.85f, 0.1f);
+            var bleu = new Color(0.2f, 0.5f, 1f);
+            var rouge = new Color(1f, 0.2f, 0.2f);
+            var vert = new Color(0.2f, 0.9f, 0.3f);
+
+            int ajoutes = 0;
+            ajoutes += Repere(scene, "Danger_1", "Jaune", jaune, 0.15f);
+            ajoutes += Repere(scene, "Danger_2", "Jaune", jaune, 0.15f);
+            ajoutes += Repere(scene, "Danger_3", "Jaune", jaune, 0.15f);
+            ajoutes += Repere(scene, "Epaule", "Bleu", bleu, 0.08f);
+            ajoutes += Repere(scene, "PointCompression", "Rouge", rouge, 0.06f);
+            ajoutes += Repere(scene, "EmplacementDroite", "Vert", vert, 0.06f);
+            ajoutes += Repere(scene, "EmplacementGauche", "Vert", vert, 0.06f);
+
+            // Couleurs du DEA : bouton Choc rouge, voyant vert
+            Colorer(scene, "BoutonChoc", "Rouge", rouge);
+            Colorer(scene, "VoyantPret", "Vert", vert);
+
+            rapport.AppendLine(ajoutes > 0
+                ? $"- Repères visibles : {ajoutes} ajouté(s) (jaune = danger, bleu = épaule, rouge = poitrine, vert = électrodes)."
+                : "- Repères visibles : déjà présents.");
+        }
+
+        private static int Repere(Scene scene, string cible, string nomCouleur, Color couleur, float taille)
+        {
+            GameObject objet = TrouverParNom(scene, cible);
+            if (objet == null || objet.transform.Find("Repere") != null) return 0;
+
+            GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            Object.DestroyImmediate(sphere.GetComponent<Collider>()); // Visuel seulement : ne gêne pas les interactions
+            sphere.name = "Repere";
+            Undo.RegisterCreatedObjectUndo(sphere, "Ajouter un repère");
+            sphere.transform.SetParent(objet.transform, false);
+            sphere.transform.localPosition = Vector3.zero;
+            sphere.transform.localScale = Vector3.one * taille;
+            sphere.GetComponent<Renderer>().sharedMaterial = MateriauRepere(nomCouleur, couleur);
+            return 1;
+        }
+
+        private static void Colorer(Scene scene, string cible, string nomCouleur, Color couleur)
+        {
+            GameObject objet = TrouverParNom(scene, cible);
+            var rendu = objet != null ? objet.GetComponent<Renderer>() : null;
+            if (rendu == null) return;
+            Undo.RecordObject(rendu, "Colorer " + cible);
+            rendu.sharedMaterial = MateriauRepere(nomCouleur, couleur);
+        }
+
+        // Un matériau simple (non éclairé) par couleur, enregistré dans Materials/Reperes
+        private static Material MateriauRepere(string nomCouleur, Color couleur)
+        {
+            const string dossier = "Assets/_Project/Materials/Reperes";
+            string chemin = $"{dossier}/Repere_{nomCouleur}.mat";
+            var materiau = AssetDatabase.LoadAssetAtPath<Material>(chemin);
+            if (materiau != null) return materiau;
+
+            if (!AssetDatabase.IsValidFolder(dossier))
+                AssetDatabase.CreateFolder("Assets/_Project/Materials", "Reperes");
+            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null) shader = Shader.Find("Unlit/Color");
+            materiau = new Material(shader);
+            materiau.SetColor("_BaseColor", couleur);
+            materiau.color = couleur;
+            AssetDatabase.CreateAsset(materiau, chemin);
+            return materiau;
         }
 
         // Sécuriser la zone : 3 dangers à regarder autour du point de départ
