@@ -26,7 +26,7 @@ Axes Unity X et Z. Les coordonnées sont en mètres dans Main, arrondies au cent
   6 │                                    SolEntrainement (0, 8)
     │
   3 │                 Téléphone      Ch42     Panneau de consignes
-    │                (−2,54, 2,65) (−0,77, 2,85) (0, 2,99)
+    │                (−2,54, 2,65) (−0,77, 2,85) (0, 2,70)
     │                                         Panneau d’entraînement (0, 3)
   1 │    DEA (−4,12, 1,48)
     │
@@ -40,7 +40,7 @@ Axes Unity X et Z. Les coordonnées sont en mètres dans Main, arrondies au cent
 - `ZoneEntrainement` et `XR Origin (XR Rig)` ont tous deux leur racine à (0, 0, 0). Le point de départ correspond à la racine sérialisée du rig. La posture réelle dépend du suivi XR.
 - `ZoneEntrainement/SolEntrainement` et `SolProvisoire` portent des composants `TeleportationArea` dans Main. Ce sont des surfaces. L’ancre fixe `Teleportation Anchor` est relevée dans la Sandbox à (3, 0, 3). Les points fixes finaux du parc restent à valider.
 - `Decor/DEA` se trouve à X −4,12 et Z 1,48. Les trois personnages sont des instances de modèles du décor. Les crédits identifient la victime comme Bryce. Aucun lien entre le rôle de victime et l’un des trois objets nommés `Ch01_nonPBR`, `Ch16_nonPBR` et `Ch42_nonPBR` n’a été confirmé dans les références de la scène et les scripts du scénario.
-- Le panneau d’entraînement et le panneau fixe de consignes sont devant le point de départ. Le menu se déplace avec le rig. Vérifier son attache au poignet gauche et son comportement avec les deux orientations de main.
+- Le panneau d’entraînement et le panneau fixe de consignes sont devant le point de départ. Le support du panneau fixe est à Z 2,70 après application de l’échelle de son instance. Le menu est parenté à la manette gauche dans Main. Vérifier la position au poignet et les orientations de la main en jeu.
 
 ## Supports dans le monde
 
