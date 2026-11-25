@@ -156,7 +156,7 @@ _À compléter aux jalons 4 et 5._
 - **Comptes rendus de réunion :** `docs/reunions/` _(à venir)_
 - **Méthode de travail :** [guide rapide](docs/guide-rapide.md)
 
-## Crédits et utilisation de l'IA
+
 
 - Ressources externes et licences : [CREDITS.md](CREDITS.md)
-- Utilisation de l'IA générative : [AI_USAGE.md](AI_USAGE.md)
+
